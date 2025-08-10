@@ -5,6 +5,8 @@ from fastapi.staticfiles import StaticFiles
 import yfinance as yf
 import pandas as pd
 from typing import List, Dict
+from routes_metrics import router as metrics_router
+
 
 app = FastAPI(title="Smart Stock Viewer API")
 
@@ -16,6 +18,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(metrics_router)
 
 # Map UI params → yfinance params
 RANGE_MAP = {
