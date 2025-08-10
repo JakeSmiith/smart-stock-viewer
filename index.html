@@ -169,6 +169,19 @@
       drawRecent();
     }
 
+    try {
+    const res = await fetch(
+      `/api/metrics?tickers=${encodeURIComponent(rawTickers)}&interval=${interval}&range=${activeWindow}`,
+      { cache: 'no-store' }
+    );
+    if (res.ok) {
+      const { metrics } = await res.json();
+      console.log('Metrics:', metrics)
+    }
+  } catch (e) {
+    console.warn('metrics fetch failed:', e);
+  }
+
     function getRecent(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.recent)||'[]'); } catch{ return []; } }
     function saveRecent(entry){ const rec = getRecent(); const filtered = [entry, ...rec.filter(x=>x!==entry)].slice(0,12); localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify(filtered)); }
     function drawRecent(){ const rec = getRecent(); const wrap = qs('#recent'); wrap.innerHTML=''; rec.forEach(s=>{ const b=document.createElement('button'); b.className='px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs whitespace-nowrap'; b.textContent=s; b.onclick=()=>{ qs('#tickers').value=s; loadAndRender().catch(()=>{}); }; wrap.appendChild(b); }); }
