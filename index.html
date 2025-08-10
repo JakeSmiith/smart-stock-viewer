@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -5,27 +6,33 @@
   <title>Smart Stock Viewer</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    ::-webkit-scrollbar{height:8px;width:8px}
+    ::-webkit-scrollbar-thumb{background:#a3a3a3;border-radius:9999px}
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100">
+<body class="bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
   <div class="min-h-screen max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
     <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
       <div>
         <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">Smart Stock Viewer</h1>
-        <p class="text-slate-400 text-sm">FastAPI + yfinance backend. Compare tickers, add indicators, and export.</p>
+        <p class="text-slate-400 text-sm">FastAPI + yfinance backend. Compare tickers, show indicators & analytics.</p>
       </div>
       <div class="flex items-center gap-3">
         <button id="toggleTheme" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm">Toggle Theme</button>
-        <a id="exportPng" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm cursor-pointer">Export Chart PNG</a>
+        <a id="exportPng" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm cursor-pointer">Export Price Chart</a>
       </div>
     </header>
 
+    <!-- Controls + Charts -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <div class="lg:col-span-8">
+      <div class="lg:col-span-8 space-y-4">
         <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
           <div class="flex flex-col lg:flex-row gap-3 lg:items-end">
             <div class="flex-1">
               <label class="block text-xs text-slate-400 mb-1" for="tickers">Ticker(s)</label>
-              <input id="tickers" class="w-full px-3 py-2 rounded-xl bg-slate-800/70 border border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. AAPL or AAPL,MSFT,VOD.L" />
+              <input id="tickers" class="w-full px-3 py-2 rounded-xl bg-slate-800/70 border border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., AAPL or AAPL,MSFT,VOD.L" />
             </div>
             <div>
               <label class="block text-xs text-slate-400 mb-1" for="interval">Interval</label>
@@ -49,9 +56,9 @@
           </div>
 
           <div class="mt-4 flex flex-wrap gap-4 items-center">
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma20" class="accent-indigo-500"/> 20‑SMA</label>
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma50" class="accent-indigo-500"/> 50‑SMA</label>
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma200" class="accent-indigo-500"/> 200‑SMA</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma20" class="accent-indigo-500"/> 20-SMA</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma50" class="accent-indigo-500"/> 50-SMA</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma200" class="accent-indigo-500"/> 200-SMA</label>
             <span id="status" class="text-xs text-slate-400"></span>
           </div>
 
@@ -59,8 +66,15 @@
             <canvas id="chart" height="120"></canvas>
           </div>
         </div>
+
+        <!-- Rolling Volatility Chart -->
+        <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+          <h2 class="text-sm font-semibold mb-3">30-Obs Rolling Volatility (annualised) – Primary</h2>
+          <canvas id="volChart" height="90"></canvas>
+        </div>
       </div>
 
+      <!-- Sidebar -->
       <aside class="lg:col-span-4 space-y-4">
         <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
           <h2 class="text-sm font-semibold mb-3">Snapshot</h2>
@@ -73,6 +87,16 @@
         </div>
 
         <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+          <h2 class="text-sm font-semibold mb-2">Metrics (Primary)</h2>
+          <div id="metrics" class="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            <div class="text-slate-400 text-xs col-span-2">Annualised Return</div><div id="mAnnRet" class="font-medium col-span-2">—</div>
+            <div class="text-slate-400 text-xs col-span-2">Annualised Volatility</div><div id="mAnnVol" class="font-medium col-span-2">—</div>
+            <div class="text-slate-400 text-xs">VaR 95% (1d)</div><div id="mVar95" class="font-medium">—</div>
+            <div class="text-slate-400 text-xs">VaR 99% (1d)</div><div id="mVar99" class="font-medium">—</div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
           <h2 class="text-sm font-semibold mb-3">Recent</h2>
           <div id="recent" class="flex gap-2 overflow-x-auto"></div>
         </div>
@@ -80,49 +104,87 @@
     </section>
 
     <footer class="mt-8 text-center text-xs text-slate-500">
-      <p>Data via <span class="font-medium">yfinance</span> (Yahoo Finance). Educational use only.</p>
+      <p>Data via <span class="font-medium">yfinance</span>. Educational use only.</p>
     </footer>
   </div>
 
   <script>
-    const qs = (s, el=document)=>el.querySelector(s);
+    // ---------- Utilities ----------
+    const qs  = (s, el=document)=>el.querySelector(s);
     const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
     const STORAGE_KEYS = { recent:'smartviewer_recent', theme:'smartviewer_theme' };
 
     function sma(series, period){
       const out = new Array(series.length).fill(null); let sum=0;
-      for(let i=0;i<series.length;i++){ sum += series[i]; if(i>=period) sum -= series[i-period]; if(i>=period-1) out[i] = +(sum/period).toFixed(4);} return out;
+      for(let i=0;i<series.length;i++){ sum += series[i]; if(i>=period) sum -= series[i-period]; if(i>=period-1) out[i] = +(sum/period).toFixed(4); }
+      return out;
     }
-    function rebaseTo100(series){ const f = series.find(v=>v!=null); return series.map(v=>v==null?null:(v/f)*100); }
-    function formatNum(n){ if(n==null||Number.isNaN(n)) return '—'; if(Math.abs(n)>=1000) return n.toLocaleString(undefined,{maximumFractionDigits:2}); return n.toFixed(2); }
+    const rebaseTo100 = (series)=>{ const f = series.find(v=>v!=null); return series.map(v=>v==null?null:(v/f)*100); };
+    const formatNum   = (n)=> (n==null||Number.isNaN(n)) ? '—' : (Math.abs(n)>=1000 ? n.toLocaleString(undefined,{maximumFractionDigits:2}) : n.toFixed(2));
+    const formatPct   = (n)=> (n==null||Number.isNaN(n)) ? '—' : `${(n*100).toFixed(2)}%`;
 
-    async function fetchOHLC(tickers, interval, window){
-      const url = `/api/ohlc?tickers=${encodeURIComponent(tickers)}&interval=${interval}&range=${window}`;
+    async function fetchOHLC(tickers, interval, range){
+      const url = `/api/ohlc?tickers=${encodeURIComponent(tickers)}&interval=${interval}&range=${range}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+    async function fetchMetrics(tickers, interval, range){
+      const url = `/api/metrics?tickers=${encodeURIComponent(tickers)}&interval=${interval}&range=${range}`;
       const res = await fetch(url, { cache: 'no-store' });
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     }
 
-    let chart;
+    // ---------- Charts ----------
+    let priceChart, volChart;
     function colorByIndex(i){ const hues=[220,160,15,280,340,95,200,25]; const h=hues[i%hues.length]; return {border:`hsl(${h} 90% 60%)`, fill:`hsl(${h} 90% 60% / 0.1)`}; }
     function buildDataset(label, labels, values, idx, filled=false){ const c=colorByIndex(idx); return {label, data:labels.map((_,i)=>values[i]), tension:0.2, borderWidth:2, pointRadius:0, borderColor:c.border, backgroundColor:filled?c.fill:'transparent', fill:filled, spanGaps:true}; }
 
-    function renderChart(labels, priceDatasets, smaDatasets){
+    function renderPriceChart(labels, priceDatasets, smaDatasets){
       const ctx = qs('#chart').getContext('2d');
-      if(chart) chart.destroy();
-      chart = new Chart(ctx, { type:'line', data:{ labels, datasets:[...priceDatasets, ...smaDatasets] }, options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12 } }, tooltip:{ callbacks:{ title:(items)=>items[0].label, label:(ctx)=>`${ctx.dataset.label}: ${formatNum(ctx.parsed.y)}` } } }, scales:{ x:{ ticks:{ maxTicksLimit:10 }, grid:{ display:false } }, y:{ ticks:{ maxTicksLimit:8 }, grid:{ color:'rgba(148,163,184,0.1)' } } } } });
+      if(priceChart) priceChart.destroy();
+      priceChart = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets:[...priceDatasets, ...smaDatasets] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12 } },
+            tooltip:{ callbacks:{ title:(items)=>items[0].label, label:(c)=>`${c.dataset.label}: ${formatNum(c.parsed.y)}` } } },
+          scales:{ x:{ ticks:{ maxTicksLimit:10 }, grid:{ display:false } }, y:{ ticks:{ maxTicksLimit:8 }, grid:{ color:'rgba(148,163,184,0.1)' } } }
+        }
+      });
     }
 
+    function renderVolChart(labels, values){
+      const ctx = qs('#volChart').getContext('2d');
+      if(volChart) volChart.destroy();
+      volChart = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets:[{ label:'Rolling Vol (ann.)', data:values.map(v=> v==null?null:(v*100)), tension:0.2, borderWidth:2, pointRadius:0 }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(c)=>`Vol: ${c.parsed.y.toFixed(2)}%` } } },
+          scales:{ x:{ ticks:{ maxTicksLimit:10 }, grid:{ display:false } }, y:{ ticks:{ callback:(v)=>`${v}%` }, grid:{ color:'rgba(148,163,184,0.1)' } } }
+        }
+      });
+    }
+
+    // ---------- Main flow ----------
     async function loadAndRender(){
       const rawTickers = qs('#tickers').value || '';
-      const interval = qs('#interval').value;
-      const windowBtn = qsa('.tf-btn').find(b=>b.classList.contains('ring-2'));
+      const interval   = qs('#interval').value;
+      const windowBtn  = qsa('.tf-btn').find(b=>b.classList.contains('ring-2'));
       const activeWindow = windowBtn ? windowBtn.dataset.window : '1Y';
 
-      if(!rawTickers.trim()){ alert('Enter at least one ticker (e.g., AAPL or AAPL,MSFT,VOD.L)'); return; }
-      qs('#status').textContent = 'Loading…';
-      const resp = await fetchOHLC(rawTickers, interval, activeWindow);
+      if(!rawTickers.trim()){ alert('Enter at least one ticker, e.g., AAPL or AAPL,MSFT,VOD.L'); return; }
 
+      qs('#status').textContent = 'Loading…';
+
+      // Prices
+      const resp = await fetchOHLC(rawTickers, interval, activeWindow);
       const firstTicker = resp.tickers[0];
       const primary = resp.data[firstTicker] || [];
       if(!primary.length){ qs('#status').textContent = 'No data.'; return; }
@@ -146,63 +208,92 @@
           pushes.forEach(({p,colorIndex})=>{
             const s = sma(arr, p);
             const lab = comparing? `${t} ${p}-SMA` : `${p}-SMA`;
-            const ds = buildDataset(lab, labels, s, colorIndex);
-            ds.borderDash = [6,4];
+            const ds = buildDataset(lab, labels, s, colorIndex); ds.borderDash = [6,4];
             smaDatasets.push(ds);
           });
         }
       });
 
-      renderChart(labels, priceDatasets, smaDatasets);
+      renderPriceChart(labels, priceDatasets, smaDatasets);
 
+      // Snapshot (primary)
       const last = primary.at(-1), first = primary[0];
       const chg = last && first ? ((last.close/first.close - 1)*100) : null;
       qs('#snapTicker').textContent = firstTicker;
-      qs('#snapPrice').textContent = last ? formatNum(last.close) : '—';
+      qs('#snapPrice').textContent  = last ? formatNum(last.close) : '—';
       qs('#snapChange').textContent = (chg!=null) ? `${chg>=0?'+':''}${chg.toFixed(2)}%` : '—';
       const hi = Math.max(...primary.map(d=>d.high));
       const lo = Math.min(...primary.map(d=>d.low));
-      qs('#snapRange').textContent = `${formatNum(lo)} – ${formatNum(hi)}`;
+      qs('#snapRange').textContent  = `${formatNum(lo)} – ${formatNum(hi)}`;
+
+      // Metrics (primary)
+      try {
+        const { metrics } = await fetchMetrics(rawTickers, interval, activeWindow);
+        const m = metrics[firstTicker];
+        if (m) {
+          // Summary card
+          qs('#mAnnRet').textContent = formatPct(m.summary.annualised_return);
+          qs('#mAnnVol').textContent = formatPct(m.summary.annualised_volatility);
+          qs('#mVar95').textContent  = formatPct(m.summary.var_95_1d);
+          qs('#mVar99').textContent  = formatPct(m.summary.var_99_1d);
+          // Rolling vol chart
+          renderVolChart(m.series.dates, m.series.rolling_vol_30);
+        } else {
+          ['mAnnRet','mAnnVol','mVar95','mVar99'].forEach(id=>qs('#'+id).textContent='—');
+          renderVolChart(labels, []); // empty
+        }
+      } catch(e) {
+        console.warn('metrics fetch failed:', e);
+      }
 
       qs('#status').textContent = '';
-      saveRecent(rawTickers.toUpperCase());
-      drawRecent();
+      saveRecent(rawTickers.toUpperCase()); drawRecent();
     }
 
-    try {
-    const res = await fetch(
-      `/api/metrics?tickers=${encodeURIComponent(rawTickers)}&interval=${interval}&range=${activeWindow}`,
-      { cache: 'no-store' }
-    );
-    if (res.ok) {
-      const { metrics } = await res.json();
-      console.log('Metrics:', metrics)
-    }
-  } catch (e) {
-    console.warn('metrics fetch failed:', e);
-  }
-
+    // ---------- Recent ----------
     function getRecent(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.recent)||'[]'); } catch{ return []; } }
-    function saveRecent(entry){ const rec = getRecent(); const filtered = [entry, ...rec.filter(x=>x!==entry)].slice(0,12); localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify(filtered)); }
-    function drawRecent(){ const rec = getRecent(); const wrap = qs('#recent'); wrap.innerHTML=''; rec.forEach(s=>{ const b=document.createElement('button'); b.className='px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs whitespace-nowrap'; b.textContent=s; b.onclick=()=>{ qs('#tickers').value=s; loadAndRender().catch(()=>{}); }; wrap.appendChild(b); }); }
+    function saveRecent(entry){ const rec=getRecent(); const filtered=[entry, ...rec.filter(x=>x!==entry)].slice(0,12); localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify(filtered)); }
+    function drawRecent(){ const rec=getRecent(); const wrap=qs('#recent'); wrap.innerHTML=''; rec.forEach(s=>{ const b=document.createElement('button'); b.className='px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs whitespace-nowrap'; b.textContent=s; b.onclick=()=>{ qs('#tickers').value=s; loadAndRender().catch(()=>{}); }; wrap.appendChild(b); }); }
 
-    function setTheme(mode){ document.documentElement.classList.toggle('dark', mode==='dark'); const body=document.body; if(mode==='light'){ body.classList.remove('bg-slate-950','text-slate-100'); body.classList.add('bg-white','text-slate-900'); } else { body.classList.add('bg-slate-950','text-slate-100'); body.classList.remove('bg-white','text-slate-900'); } localStorage.setItem(STORAGE_KEYS.theme, mode); }
+    // ---------- Theme ----------
+    function setTheme(mode){
+      document.documentElement.classList.toggle('dark', mode==='dark');
+      const body=document.body;
+      if(mode==='light'){ body.classList.remove('bg-slate-950','text-slate-100'); body.classList.add('bg-white','text-slate-900'); }
+      else { body.classList.add('bg-slate-950','text-slate-100'); body.classList.remove('bg-white','text-slate-900'); }
+      localStorage.setItem(STORAGE_KEYS.theme, mode);
+    }
 
+    // ---------- Events ----------
     window.addEventListener('DOMContentLoaded', ()=>{
-      const pref = localStorage.getItem(STORAGE_KEYS.theme) || 'dark'; setTheme(pref);
+      setTheme(localStorage.getItem(STORAGE_KEYS.theme) || 'dark');
       drawRecent();
-      qs('#tickers').value = 'AAPL,MSFT'; // demo
+
+      // Default demo
+      qs('#tickers').value = 'AAPL,MSFT';
       loadAndRender().catch(console.warn);
 
+      // Handlers
       qs('#loadBtn').addEventListener('click', ()=> loadAndRender().catch(e=>alert(e.message||String(e))));
-      qsa('.tf-btn').forEach(btn=> btn.addEventListener('click', (e)=>{ qsa('.tf-btn').forEach(b=>b.classList.remove('ring-2','ring-indigo-500')); e.currentTarget.classList.add('ring-2','ring-indigo-500'); loadAndRender().catch(()=>{}); }));
-      qs('#tickers').addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadAndRender().catch(()=>{}); });
+      qsa('.tf-btn').forEach(btn => btn.addEventListener('click', (e)=>{
+        qsa('.tf-btn').forEach(b=>b.classList.remove('ring-2','ring-indigo-500'));
+        e.currentTarget.classList.add('ring-2','ring-indigo-500');
+        loadAndRender().catch(()=>{});
+      }));
+      qs('#tickers').addEventListener('keydown', e => { if(e.key==='Enter') loadAndRender().catch(()=>{}); });
       qs('#interval').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
       qs('#sma20').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
       qs('#sma50').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
       qs('#sma200').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
       qs('#toggleTheme').addEventListener('click', ()=> setTheme((localStorage.getItem('smartviewer_theme')||'dark')==='dark'?'light':'dark'));
-      qs('#exportPng').addEventListener('click', ()=>{ if(!chart) return; const a=document.createElement('a'); a.href=chart.toBase64Image(); const t=(qs('#tickers').value||'chart').replace(/[^A-Za-z0-9_,.-]/g,''); a.download=`${t}_${new Date().toISOString().slice(0,10)}.png`; a.click(); });
+      qs('#exportPng').addEventListener('click', ()=>{
+        if(!priceChart) return;
+        const a=document.createElement('a');
+        a.href = priceChart.toBase64Image();
+        const t=(qs('#tickers').value||'chart').replace(/[^A-Za-z0-9_,.-]/g,'');
+        a.download = `${t}_${new Date().toISOString().slice(0,10)}.png`;
+        a.click();
+      });
     });
   </script>
 </body>
