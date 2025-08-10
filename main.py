@@ -1,4 +1,3 @@
-```python
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -82,4 +81,3 @@ async def ohlc(
 
 # Serve the static front-end from the repo root (index.html)
 app.mount("/", StaticFiles(directory=".", html=True), name="static")
-```
