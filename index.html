@@ -4,23 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Smart Stock Viewer</title>
-  <!-- Tailwind CSS (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <style>
-    /* Subtle scrollbar for overflow panes */
-    ::-webkit-scrollbar { height: 8px; width: 8px; }
-    ::-webkit-scrollbar-thumb { background: #a3a3a3; border-radius: 9999px; }
-  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+<body class="bg-slate-950 text-slate-100">
   <div class="min-h-screen max-w-6xl mx-auto p-4 sm:p-6">
-    <!-- Header -->
     <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
       <div>
         <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">Smart Stock Viewer</h1>
-        <p class="text-slate-400 text-sm">Client‑only, no API key. Data via Stooq CSV. Compare tickers, add indicators, and export.</p>
+        <p class="text-slate-400 text-sm">FastAPI + yfinance backend. Compare tickers, add indicators, and export.</p>
       </div>
       <div class="flex items-center gap-3">
         <button id="toggleTheme" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm">Toggle Theme</button>
@@ -28,14 +20,13 @@
       </div>
     </header>
 
-    <!-- Controls -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8">
         <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
           <div class="flex flex-col lg:flex-row gap-3 lg:items-end">
             <div class="flex-1">
               <label class="block text-xs text-slate-400 mb-1" for="tickers">Ticker(s)</label>
-              <input id="tickers" class="w-full px-3 py-2 rounded-xl bg-slate-800/70 border border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. AAPL or AAPL,MSFT,NVDA" />
+              <input id="tickers" class="w-full px-3 py-2 rounded-xl bg-slate-800/70 border border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. AAPL or AAPL,MSFT,VOD.L" />
             </div>
             <div>
               <label class="block text-xs text-slate-400 mb-1" for="interval">Interval</label>
@@ -62,7 +53,7 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma20" class="accent-indigo-500"/> 20‑SMA</label>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma50" class="accent-indigo-500"/> 50‑SMA</label>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sma200" class="accent-indigo-500"/> 200‑SMA</label>
-            <span class="text-xs text-slate-500">Tip: comma‑separate tickers to compare (they’ll be rebased to 100).</span>
+            <span id="status" class="text-xs text-slate-400"></span>
           </div>
 
           <div class="mt-4">
@@ -74,30 +65,11 @@
       <aside class="lg:col-span-4 space-y-4">
         <div class="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
           <h2 class="text-sm font-semibold mb-3">Snapshot</h2>
-          <div id="snapshot" class="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div class="text-slate-400 text-xs">Primary</div>
-              <div id="snapTicker" class="font-medium">—</div>
-            </div>
-            <div>
-              <div class="text-slate-400 text-xs">Last Close</div>
-              <div id="snapPrice" class="font-medium">—</div>
-            </div>
-            <div>
-              <div class="text-slate-400 text-xs">Change</div>
-              <div id="snapChange" class="font-medium">—</div>
-            </div>
-            <div>
-              <div class="text-slate-400 text-xs">Range (window)</div>
-              <div id="snapRange" class="font-medium">—</div>
-            </div>
-            <div class="col-span-2">
-              <div class="text-slate-400 text-xs">Notes</div>
-              <textarea id="notes" placeholder="Your notes…" class="mt-1 w-full min-h-[80px] px-3 py-2 rounded-xl bg-slate-800/70 border border-slate-700 text-sm"></textarea>
-              <div class="flex justify-end mt-2">
-                <button id="saveNotes" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs">Save notes</button>
-              </div>
-            </div>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div><div class="text-slate-400 text-xs">Primary</div><div id="snapTicker" class="font-medium">—</div></div>
+            <div><div class="text-slate-400 text-xs">Last Close</div><div id="snapPrice" class="font-medium">—</div></div>
+            <div><div class="text-slate-400 text-xs">Change</div><div id="snapChange" class="font-medium">—</div></div>
+            <div><div class="text-slate-400 text-xs">Range (window)</div><div id="snapRange" class="font-medium">—</div></div>
           </div>
         </div>
 
@@ -109,369 +81,118 @@
     </section>
 
     <footer class="mt-8 text-center text-xs text-slate-500">
-      <p>Data courtesy of <a href="https://stooq.com/" target="_blank" class="underline">Stooq</a>. This tool is for educational purposes only.</p>
+      <p>Data via <span class="font-medium">yfinance</span> (Yahoo Finance). Educational use only.</p>
     </footer>
   </div>
 
   <script>
-    // ---------- Utilities ----------
-    const qs = (sel, el=document) => el.querySelector(sel);
-    const qsa = (sel, el=document) => [...el.querySelectorAll(sel)];
+    const qs = (s, el=document)=>el.querySelector(s);
+    const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
+    const STORAGE_KEYS = { recent:'smartviewer_recent', theme:'smartviewer_theme' };
 
-    const STORAGE_KEYS = {
-      recent: 'smartviewer_recent',
-      notes: 'smartviewer_notes',
-      theme: 'smartviewer_theme'
-    };
-
-    function toCSVRows(text) {
-      return text.trim().split(/\r?\n/).map(r => r.split(','));
+    function sma(series, period){
+      const out = new Array(series.length).fill(null); let sum=0;
+      for(let i=0;i<series.length;i++){ sum += series[i]; if(i>=period) sum -= series[i-period]; if(i>=period-1) out[i] = +(sum/period).toFixed(4);} return out;
     }
+    function rebaseTo100(series){ const f = series.find(v=>v!=null); return series.map(v=>v==null?null:(v/f)*100); }
+    function formatNum(n){ if(n==null||Number.isNaN(n)) return '—'; if(Math.abs(n)>=1000) return n.toLocaleString(undefined,{maximumFractionDigits:2}); return n.toFixed(2); }
 
-    function parseStooqCSV(csvText) {
-      const rows = toCSVRows(csvText);
-      const header = rows.shift();
-      const idx = Object.fromEntries(header.map((h,i)=>[h.toLowerCase(), i]));
-      const data = rows.map(r => ({
-        date: new Date(r[idx['date']]),
-        open: parseFloat(r[idx['open']]),
-        high: parseFloat(r[idx['high']]),
-        low: parseFloat(r[idx['low']]),
-        close: parseFloat(r[idx['close']]),
-        volume: parseFloat(r[idx['volume']])
-      })).filter(d => !Number.isNaN(d.close));
-      // Ensure ascending by date
-      data.sort((a,b)=>a.date-b.date);
-      return data;
-    }
-
-    function sma(series, period) {
-      const out = new Array(series.length).fill(null);
-      let sum = 0;
-      for (let i = 0; i < series.length; i++) {
-        sum += series[i];
-        if (i >= period) sum -= series[i - period];
-        if (i >= period - 1) out[i] = +(sum / period).toFixed(4);
-      }
-      return out;
-    }
-
-    function rebaseTo100(series) {
-      const first = series.find(v => v != null);
-      return series.map(v => (v==null? null : (v/first)*100));
-    }
-
-    function formatNum(n) {
-      if (n == null || Number.isNaN(n)) return '—';
-      if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, {maximumFractionDigits:2});
-      return n.toFixed(2);
-    }
-
-    function daysAgo(date, n) {
-      const d = new Date(date);
-      d.setDate(d.getDate() - n);
-      return d;
-    }
-
-    function filterByWindow(data, windowLabel) {
-      if (windowLabel === 'MAX') return data;
-      const latest = data.at(-1)?.date;
-      if (!latest) return data;
-      const map = { '1M': 31, '3M': 93, '6M': 186, '1Y': 365, '5Y': 1825 };
-      const days = map[windowLabel] || 365;
-      const floor = daysAgo(latest, days);
-      return data.filter(d => d.date >= floor);
-    }
-
-    // ---------- Data Layer ----------
-    async function fetchStooqCSV(ticker, interval='d') {
-      // Stooq expects lowercase tickers, CSV
-      const t = ticker.trim().toLowerCase();
-      const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(t)}&i=${interval}`;
+    async function fetchOHLC(tickers, interval, window){
+      const url = `/api/ohlc?tickers=${encodeURIComponent(tickers)}&interval=${interval}&range=${window}`;
       const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      const text = await res.text();
-      if (!text || !text.includes('Date,Open,High,Low,Close,Volume')) {
-        throw new Error('No data returned. Check the ticker or interval.');
-      }
-      return parseStooqCSV(text);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     }
 
-    const cache = new Map();
-
-    async function getSeries(ticker, interval) {
-      const key = `${ticker}|${interval}`.toUpperCase();
-      if (cache.has(key)) return cache.get(key);
-      const data = await fetchStooqCSV(ticker, interval);
-      cache.set(key, data);
-      return data;
-    }
-
-    // ---------- Chart Layer ----------
     let chart;
+    function colorByIndex(i){ const hues=[220,160,15,280,340,95,200,25]; const h=hues[i%hues.length]; return {border:`hsl(${h} 90% 60%)`, fill:`hsl(${h} 90% 60% / 0.1)`}; }
+    function buildDataset(label, labels, values, idx, filled=false){ const c=colorByIndex(idx); return {label, data:labels.map((_,i)=>values[i]), tension:0.2, borderWidth:2, pointRadius:0, borderColor:c.border, backgroundColor:filled?c.fill:'transparent', fill:filled, spanGaps:true}; }
 
-    function colorByIndex(i) {
-      // Distinct palette without hardcoding specific colors (Chart.js will auto-assign but we can vary opacity)
-      const hues = [220, 160, 15, 280, 340, 95, 200, 25];
-      const h = hues[i % hues.length];
-      return {
-        border: `hsl(${h} 90% 60%)`,
-        fill: `hsl(${h} 90% 60% / 0.1)`
-      };
-    }
-
-    function buildDataset(label, labels, values, idx, filled=false) {
-      const c = colorByIndex(idx);
-      return {
-        label,
-        data: labels.map((_, i) => values[i]),
-        tension: 0.2,
-        borderWidth: 2,
-        pointRadius: 0,
-        borderColor: c.border,
-        backgroundColor: filled ? c.fill : 'transparent',
-        fill: filled,
-        spanGaps: true,
-      };
-    }
-
-    function renderChart(seriesMap, options) {
+    function renderChart(labels, priceDatasets, smaDatasets){
       const ctx = qs('#chart').getContext('2d');
-      const labels = seriesMap.primary.labels;
-      const datasets = [...seriesMap.priceDatasets, ...seriesMap.smaDatasets];
-
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-          animation: { duration: 300 },
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 12 } },
-            tooltip: {
-              callbacks: {
-                title: (items) => items[0].label,
-                label: (ctx) => `${ctx.dataset.label}: ${formatNum(ctx.parsed.y)}`
-              }
-            }
-          },
-          scales: {
-            x: {
-              ticks: { maxTicksLimit: 10 },
-              grid: { display: false }
-            },
-            y: {
-              ticks: { maxTicksLimit: 8 },
-              grid: { color: 'rgba(148,163,184,0.1)' }
-            }
-          }
-        }
-      });
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, { type:'line', data:{ labels, datasets:[...priceDatasets, ...smaDatasets] }, options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12 } }, tooltip:{ callbacks:{ title:(items)=>items[0].label, label:(ctx)=>`${ctx.dataset.label}: ${formatNum(ctx.parsed.y)}` } } }, scales:{ x:{ ticks:{ maxTicksLimit:10 }, grid:{ display:false } }, y:{ ticks:{ maxTicksLimit:8 }, grid:{ color:'rgba(148,163,184,0.1)' } } } } });
     }
 
-    // ---------- UI Logic ----------
-    async function loadAndRender() {
+    async function loadAndRender(){
       const rawTickers = qs('#tickers').value || '';
       const interval = qs('#interval').value;
-      const tickers = rawTickers.split(',').map(t => t.trim()).filter(Boolean);
-      if (tickers.length === 0) {
-        alert('Please enter at least one ticker. Example: AAPL');
-        return;
-      }
+      const windowBtn = qsa('.tf-btn').find(b=>b.classList.contains('ring-2'));
+      const activeWindow = windowBtn ? windowBtn.dataset.window : '1Y';
 
-      // Save to recent list
-      saveRecent(rawTickers.toUpperCase());
+      if(!rawTickers.trim()){ alert('Enter at least one ticker (e.g., AAPL or AAPL,MSFT,VOD.L)'); return; }
+      qs('#status').textContent = 'Loading…';
+      const resp = await fetchOHLC(rawTickers, interval, activeWindow);
 
-      // Fetch all series
-      const datasets = await Promise.allSettled(tickers.map(t => getSeries(t, interval)));
-      const ok = [];
-      const labelsPrimary = [];
-      const priceDatasets = [];
-      const smaDatasets = [];
+      const firstTicker = resp.tickers[0];
+      const primary = resp.data[firstTicker] || [];
+      if(!primary.length){ qs('#status').textContent = 'No data.'; return; }
 
-      const windowBtn = qsa('.tf-btn').find(b => b.classList.contains('ring-2'));
-      const activeWindow = windowBtn ? windowBtn.dataset.window : 'MAX';
+      const labels = primary.map(d=>d.date);
+      const priceDatasets = []; const smaDatasets = [];
+      const comparing = resp.tickers.length > 1;
 
-      datasets.forEach((res, idx) => {
-        const t = tickers[idx].toUpperCase();
-        if (res.status === 'fulfilled' && res.value.length) {
-          let data = res.value;
-          data = filterByWindow(data, activeWindow);
-          ok.push({ ticker: t, data });
-        } else {
-          console.warn('Failed for', t, res.reason);
-        }
-      });
+      resp.tickers.forEach((t, i)=>{
+        const arr = (resp.data[t]||[]).map(d=>d.close);
+        const series = comparing ? rebaseTo100(arr) : arr;
+        priceDatasets.push(buildDataset(comparing?`${t} (rebased)`:t, labels, series, i, i===0));
 
-      if (!ok.length) {
-        alert('No data found for any of the tickers. Try different symbols.');
-        return;
-      }
-
-      // Build labels (primary = first ticker)
-      const primary = ok[0];
-      const labels = primary.data.map(d => d.date.toISOString().slice(0,10));
-      labelsPrimary.push(...labels);
-
-      const comparing = ok.length > 1;
-
-      ok.forEach(({ticker, data}, i) => {
-        const closes = data.map(d => d.close);
-        const series = comparing ? rebaseTo100(closes) : closes;
-        priceDatasets.push(buildDataset(comparing ? `${ticker} (rebased)` : ticker, labels, series, i, i===0));
-
-        // Indicators only for primary when comparing (to avoid clutter)
         const addIndicators = (!comparing || i===0);
-        if (addIndicators) {
+        if(addIndicators){
           const do20 = qs('#sma20').checked, do50 = qs('#sma50').checked, do200 = qs('#sma200').checked;
           const pushes = [];
-          if (do20) pushes.push({p:20, colorIndex: i});
-          if (do50) pushes.push({p:50, colorIndex: i+1});
-          if (do200) pushes.push({p:200, colorIndex: i+2});
-          pushes.forEach(({p, colorIndex}) => {
-            const arr = sma(closes, p);
-            const lab = comparing ? `${ticker} ${p}-SMA` : `${p}-SMA`;
-            const ds = buildDataset(lab, labels, arr, colorIndex);
+          if(do20) pushes.push({p:20, colorIndex:i});
+          if(do50) pushes.push({p:50, colorIndex:i+1});
+          if(do200) pushes.push({p:200, colorIndex:i+2});
+          pushes.forEach(({p,colorIndex})=>{
+            const s = sma(arr, p);
+            const lab = comparing? `${t} ${p}-SMA` : `${p}-SMA`;
+            const ds = buildDataset(lab, labels, s, colorIndex);
             ds.borderDash = [6,4];
             smaDatasets.push(ds);
           });
         }
       });
 
-      renderChart({
-        primary: { labels: labelsPrimary },
-        priceDatasets,
-        smaDatasets
-      });
+      renderChart(labels, priceDatasets, smaDatasets);
 
-      // Update snapshot using primary ticker
-      const p = ok[0];
-      const last = p.data.at(-1);
-      const first = p.data[0];
-      const chg = last && first ? ((last.close/first.close - 1) * 100) : null;
-      qs('#snapTicker').textContent = p.ticker;
+      const last = primary.at(-1), first = primary[0];
+      const chg = last && first ? ((last.close/first.close - 1)*100) : null;
+      qs('#snapTicker').textContent = firstTicker;
       qs('#snapPrice').textContent = last ? formatNum(last.close) : '—';
       qs('#snapChange').textContent = (chg!=null) ? `${chg>=0?'+':''}${chg.toFixed(2)}%` : '—';
-      const hi = Math.max(...p.data.map(d => d.high));
-      const lo = Math.min(...p.data.map(d => d.low));
+      const hi = Math.max(...primary.map(d=>d.high));
+      const lo = Math.min(...primary.map(d=>d.low));
       qs('#snapRange').textContent = `${formatNum(lo)} – ${formatNum(hi)}`;
 
-      // Persist notes per first ticker in the input (primary)
-      const key = `notes:${p.ticker}`;
-      qs('#notes').value = localStorage.getItem(key) || '';
-      qs('#saveNotes').onclick = () => {
-        localStorage.setItem(key, qs('#notes').value);
-        toast('Notes saved');
-      };
-    }
-
-    // ---------- Recent list ----------
-    function getRecent() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.recent) || '[]');
-      } catch { return []; }
-    }
-
-    function saveRecent(entry) {
-      const rec = getRecent();
-      // Remove dupes, keep max 12
-      const filtered = [entry, ...rec.filter(x => x !== entry)].slice(0,12);
-      localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify(filtered));
+      qs('#status').textContent = '';
+      saveRecent(rawTickers.toUpperCase());
       drawRecent();
     }
 
-    function drawRecent() {
-      const rec = getRecent();
-      const wrap = qs('#recent');
-      wrap.innerHTML = '';
-      rec.forEach(s => {
-        const btn = document.createElement('button');
-        btn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs whitespace-nowrap';
-        btn.textContent = s;
-        btn.onclick = () => { qs('#tickers').value = s; loadAndRender(); };
-        wrap.appendChild(btn);
-      });
-    }
+    function getRecent(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.recent)||'[]'); } catch{ return []; } }
+    function saveRecent(entry){ const rec = getRecent(); const filtered = [entry, ...rec.filter(x=>x!==entry)].slice(0,12); localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify(filtered)); }
+    function drawRecent(){ const rec = getRecent(); const wrap = qs('#recent'); wrap.innerHTML=''; rec.forEach(s=>{ const b=document.createElement('button'); b.className='px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs whitespace-nowrap'; b.textContent=s; b.onclick=()=>{ qs('#tickers').value=s; loadAndRender().catch(()=>{}); }; wrap.appendChild(b); }); }
 
-    // ---------- Theme ----------
-    function setTheme(mode) {
-      document.documentElement.classList.toggle('dark', mode === 'dark');
-      const body = document.body;
-      if (mode === 'light') {
-        body.classList.remove('bg-slate-950','text-slate-100');
-        body.classList.add('bg-white','text-slate-900');
-      } else {
-        body.classList.add('bg-slate-950','text-slate-100');
-        body.classList.remove('bg-white','text-slate-900');
-      }
-      localStorage.setItem(STORAGE_KEYS.theme, mode);
-    }
+    function setTheme(mode){ document.documentElement.classList.toggle('dark', mode==='dark'); const body=document.body; if(mode==='light'){ body.classList.remove('bg-slate-950','text-slate-100'); body.classList.add('bg-white','text-slate-900'); } else { body.classList.add('bg-slate-950','text-slate-100'); body.classList.remove('bg-white','text-slate-900'); } localStorage.setItem(STORAGE_KEYS.theme, mode); }
 
-    function initTheme() {
-      const pref = localStorage.getItem(STORAGE_KEYS.theme) || 'dark';
-      setTheme(pref);
-    }
-
-    // ---------- Toast ----------
-    let toastEl;
-    function toast(msg) {
-      if (!toastEl) {
-        toastEl = document.createElement('div');
-        toastEl.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 px-3 py-2 rounded-xl bg-slate-800 text-slate-100 text-sm shadow-lg';
-        document.body.appendChild(toastEl);
-      }
-      toastEl.textContent = msg;
-      toastEl.style.opacity = 1;
-      setTimeout(()=> toastEl && (toastEl.style.opacity = 0), 1500);
-    }
-
-    // ---------- Events ----------
-    window.addEventListener('DOMContentLoaded', () => {
-      initTheme();
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const pref = localStorage.getItem(STORAGE_KEYS.theme) || 'dark'; setTheme(pref);
       drawRecent();
+      qs('#tickers').value = 'AAPL,MSFT'; // demo
+      loadAndRender().catch(console.warn);
 
-      // Default example
-      qs('#tickers').value = 'AAPL';
-      loadAndRender().catch(err => console.warn(err));
-
-      qs('#loadBtn').addEventListener('click', () => {
-        loadAndRender().catch(err => alert(err.message || String(err)));
-      });
-
-      qsa('.tf-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          qsa('.tf-btn').forEach(b => b.classList.remove('ring-2','ring-indigo-500'));
-          e.currentTarget.classList.add('ring-2','ring-indigo-500');
-          loadAndRender().catch(()=>{});
-        });
-      });
-
-      qs('#tickers').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { loadAndRender().catch(()=>{}); }
-      });
-
-      qs('#interval').addEventListener('change', () => loadAndRender().catch(()=>{}));
-      qs('#sma20').addEventListener('change', () => loadAndRender().catch(()=>{}));
-      qs('#sma50').addEventListener('change', () => loadAndRender().catch(()=>{}));
-      qs('#sma200').addEventListener('change', () => loadAndRender().catch(()=>{}));
-
-      qs('#toggleTheme').addEventListener('click', () => {
-        const next = (localStorage.getItem(STORAGE_KEYS.theme) || 'dark') === 'dark' ? 'light' : 'dark';
-        setTheme(next);
-      });
-
-      qs('#exportPng').addEventListener('click', () => {
-        if (!chart) return;
-        const a = document.createElement('a');
-        a.href = chart.toBase64Image();
-        const t = (qs('#tickers').value || 'chart').replace(/[^A-Za-z0-9_,.-]/g,'');
-        a.download = `${t}_${new Date().toISOString().slice(0,10)}.png`;
-        a.click();
-      });
+      qs('#loadBtn').addEventListener('click', ()=> loadAndRender().catch(e=>alert(e.message||String(e))));
+      qsa('.tf-btn').forEach(btn=> btn.addEventListener('click', (e)=>{ qsa('.tf-btn').forEach(b=>b.classList.remove('ring-2','ring-indigo-500')); e.currentTarget.classList.add('ring-2','ring-indigo-500'); loadAndRender().catch(()=>{}); }));
+      qs('#tickers').addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadAndRender().catch(()=>{}); });
+      qs('#interval').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
+      qs('#sma20').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
+      qs('#sma50').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
+      qs('#sma200').addEventListener('change', ()=> loadAndRender().catch(()=>{}));
+      qs('#toggleTheme').addEventListener('click', ()=> setTheme((localStorage.getItem('smartviewer_theme')||'dark')==='dark'?'light':'dark'));
+      qs('#exportPng').addEventListener('click', ()=>{ if(!chart) return; const a=document.createElement('a'); a.href=chart.toBase64Image(); const t=(qs('#tickers').value||'chart').replace(/[^A-Za-z0-9_,.-]/g,''); a.download=`${t}_${new Date().toISOString().slice(0,10)}.png`; a.click(); });
     });
   </script>
 </body>
 </html>
+```
