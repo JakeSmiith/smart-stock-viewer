@@ -1,7 +1,5 @@
-```text
 fastapi
 uvicorn[standard]
 yfinance
 pandas
 numpy
-```
