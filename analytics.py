@@ -1,9 +1,3 @@
-"""FastAPI router that computes analytics on demand.
-
-Mount this router in `main.py` so that when the user clicks search on the
-frontend, you can hit `/api/metrics?...` to get period returns, annualised
-returns, rolling volatility, and VaR.
-"""
 from __future__ import annotations
 
 from typing import Dict, List
